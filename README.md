@@ -1,0 +1,18 @@
+This research project investigates a novel approach called selective normalization, which modifies the interaction between dropout and normalization layers during neural network training.
+In conventional pipelines, batch normalization or similar methods operate on all neuron activations, including those that will later be deactivated by dropout. 
+This mismatch can distort the statistical assumptions underlying normalization, potentially introducing instability or inefficiency during training.
+
+Selective normalization addresses this by normalizing only the active (non-dropped) neurons during each forward pass. The goal is to make the network's normalization dynamics more consistent 
+with its actual structure at each moment during training. By adapting the normalization step to exclude dropped neurons, we aim to improve convergence speed, reduce training instability, and enhance generalization.
+
+This repository provides a complete experimental framework to rigorously evaluate selective normalization across a wide range of conditions. 
+The implementation includes five core methods for comparison: a pure baseline without dropout or normalization, dropout only, normalization only, a standard dropout-then-normalization configuration, and the proposed selective normalization method. 
+The experiments are structured to identify not only raw performance differences but also how these methods affect training dynamics, convergence behavior, and inference reliability.
+
+The framework spans multiple architectures, including multilayer perceptrons, convolutional networks, recurrent networks, and transformers. It covers diverse datasets such as MNIST, CIFAR-10, CIFAR-100, IMDB, UCI Adult, and TinyImageNet.
+All models are tested under various hyperparameter settings including dropout rates, batch sizes, learning rates, and optimizer choices.
+To ensure robust evaluation, we track both primary and secondary metrics, including test accuracy, training and validation loss trajectories, convergence speed, training stability, inference time, memory usage, gradient flow, and activation statistics. 
+Visualization notebooks, dashboard components, and an organized logging structure are included for analysis.
+
+Selective normalization is still an open question, but this research provides the tools and design needed to determine whether the idea leads to practical improvements over existing methods. 
+Whether or not the method succeeds, this study aims to clarify the effects of dropout-normalization interaction and contribute a reproducible, well-analyzed body of work to the community.
