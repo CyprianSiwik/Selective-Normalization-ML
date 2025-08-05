@@ -1,12 +1,12 @@
-# RNN model definition
+# Lightweight RNN model definition
 import torch
 import torch.nn as nn
 
-class RNNClassifier(nn.Module):
+class LightRNN(nn.Module):
     def __init__(self,
                  vocab_size,
-                 embed_dim=128,
-                 hidden_dim=128,
+                 embed_dim=64,
+                 hidden_dim=64,
                  num_layers=1,
                  num_classes=2,
                  rnn_type='lstm',
@@ -14,12 +14,12 @@ class RNNClassifier(nn.Module):
                  dropout=0.5,
                  pad_idx=0):
         """
-        Generic RNN-based classifier for text.
+        Lightweight RNN-based classifier for text with reduced dimensions.
 
         Args:
             vocab_size (int): Vocabulary size.
-            embed_dim (int): Embedding dimension.
-            hidden_dim (int): RNN hidden state size.
+            embed_dim (int): Embedding dimension (reduced from 128 to 64).
+            hidden_dim (int): RNN hidden state size (reduced from 128 to 64).
             num_layers (int): Number of RNN layers.
             num_classes (int): Number of output classes.
             rnn_type (str): One of ['rnn', 'lstm', 'gru'].
@@ -27,7 +27,7 @@ class RNNClassifier(nn.Module):
             dropout (float): Dropout rate.
             pad_idx (int): Index for padding token in embedding.
         """
-        super(RNNClassifier, self).__init__()
+        super(LightRNN, self).__init__()
 
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=pad_idx)
         self.rnn_type = rnn_type.lower()
