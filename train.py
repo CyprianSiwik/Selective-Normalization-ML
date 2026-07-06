@@ -8,6 +8,7 @@ import csv
 import os
 import sys
 import resource
+import numpy as np
 
 from evaluate import evaluate_detailed
 from visualize import plot_training_curves, plot_extra_metrics
@@ -44,7 +45,14 @@ def _find_study_site(model):
 
 
 def _attach_activation_hook(model):
-    stats = {'sum_mean': 0.0, 'sum_std': 0.0, 'count': 0}
+    """
+    Track running mean/std of the study-site activations, and keep a raw
+    sample of its output from the most recent training batch — used to
+    plot activation-distribution histograms (see plot_activation_histograms.py)
+    that make the dropout/normalization distortion the README describes
+    directly visible, rather than only summarized as a scalar.
+    """
+    stats = {'sum_mean': 0.0, 'sum_std': 0.0, 'count': 0, 'last_raw': None}
     site = _find_study_site(model)
 
     def hook(module, inputs, output):
@@ -53,6 +61,7 @@ def _attach_activation_hook(model):
                 stats['sum_mean'] += output.mean().item()
                 stats['sum_std'] += output.std().item()
                 stats['count'] += 1
+                stats['last_raw'] = output.detach().cpu().numpy().ravel()
 
     handle = site.register_forward_hook(hook) if site is not None else None
     return stats, handle
@@ -133,6 +142,12 @@ def train(model, train_loader, test_loader, epochs=10, lr=0.001, log_file='train
 
     if hook_handle is not None:
         hook_handle.remove()
+
+    # Save a raw activation sample from the final training batch, for
+    # cross-method distribution comparisons (plot_activation_histograms.py).
+    if activation_stats['last_raw'] is not None:
+        log_dir = os.path.dirname(log_file) or '.'
+        np.save(os.path.join(log_dir, 'activation_sample.npy'), activation_stats['last_raw'])
 
     # Plot loss/accuracy and the extra diagnostic metrics
     plot_training_curves(history['Train Loss'], history['Train Acc (%)'], history['Test Acc (%)'], plot_dir)

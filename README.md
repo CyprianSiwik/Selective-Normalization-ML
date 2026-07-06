@@ -30,11 +30,13 @@ python main.py --method <baseline|dropout|norm|standard_combo|selective> \
 
 ## Running the full comparison (the actual hypothesis test)
 
-A single run tells you nothing about whether selective normalization helps — you need all five methods run under matched conditions. `run_experiments.py` sweeps the method × model × dataset matrix and writes each run to its own directory under `results/` so nothing gets overwritten:
+A single run, or even five runs at one dropout rate, doesn't tell you much — the comparison that actually matters is `selective` vs. `standard_combo` (both use dropout + normalization; they differ only in whether normalization stats are computed before or after excluding dropped neurons), and specifically whether their gap *grows with dropout rate*, since that's the mechanism the hypothesis claims. `run_experiments.py` sweeps the method × model × dataset × dropout-rate matrix and writes each run to its own directory under `results/` so nothing gets overwritten:
 
 ```
 python run_experiments.py --datasets mnist uci_adult cifar10 --models cnn mlp rnn \
-                           --epochs 20 --seeds 0 1 2 --results_dir results
+                           --epochs 20 --seeds 0 1 2 \
+                           --dropout_rates 0.1 0.3 0.5 0.7 0.9 \
+                           --results_dir results
 ```
 
 Invalid (model, dataset) pairs (e.g. `cnn`+`uci_adult`) are skipped automatically, and a failed run (e.g. a flaky download) doesn't abort the sweep — it's recorded in `results/manifest.json` and excluded from the comparison. Then aggregate:
@@ -43,4 +45,17 @@ Invalid (model, dataset) pairs (e.g. `cnn`+`uci_adult`) are skipped automaticall
 python compare_results.py --results_dir results
 ```
 
-This writes `results/summary.csv` (per-run metrics), `results/summary_by_method.csv` (averaged across seeds, ranked by best test accuracy per model/dataset), and overlay plots per model/dataset combo in `results/comparison/` showing all five methods' test-accuracy curves on the same axes — the figure that actually answers the README's question.
+This writes:
+- `results/summary.csv` — per-run metrics.
+- `results/summary_by_method.csv` — averaged across seeds, ranked by best test accuracy per model/dataset/dropout_rate.
+- `results/significance_selective_vs_standard_combo.csv` — a paired t-test (paired by seed) at each dropout rate; needs `--seeds` with at least 2 values to produce a p-value.
+- `results/comparison/compare_<model>_<dataset>[_dr<rate>].png` — test-accuracy-vs-epoch curves, one figure per dropout rate.
+- `results/comparison/dropout_gap_<model>_<dataset>.png` — **the key plot**: (selective − standard_combo) best-test-accuracy gap vs. dropout rate, with error bars across seeds. A gap that grows with dropout rate is evidence *for* the hypothesis; flat/near-zero across the whole sweep is evidence *against* it. Needs at least two `--dropout_rates` values to render.
+
+For the mechanistic (not just accuracy) picture, overlay the actual activation distributions at the normalization study site:
+
+```
+python plot_activation_histograms.py --results_dir results
+```
+
+This writes `results/activation_histograms/activation_hist_<model>_<dataset>_dr<rate>.png`, comparing all five methods' post-normalization activation distributions at a given dropout rate — a direct look at whether `standard_combo` actually distorts the distribution relative to `selective`, independent of downstream accuracy.
