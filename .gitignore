@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+data/MNIST/
+data/cifar-10-batches-py/
+data/cifar-100-python/
+data/*.tar.gz
+training_log.csv
+plots/
+.idea/

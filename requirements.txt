@@ -1,1 +1,7 @@
-# Add your dependencies here
+torch
+torchvision
+torchtext
+pandas
+scikit-learn
+matplotlib
+numpy

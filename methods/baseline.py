@@ -6,15 +6,11 @@ from models.light_cnn import LightCNN
 from models.light_mlp import LightMLP
 from models.light_rnn import LightRNN
 
-from data import cifar
-from data import mnist
-from data import imdb
-from data import uci_adult
-
 from train import train
 
 
-def run_baseline(model_type='cnn', dataset='cifar10', lightweight=False, batch_size=64):
+def run_baseline(model_type='cnn', dataset='cifar10', lightweight=False, batch_size=64,
+                  epochs=10, lr=0.001, log_file='training_log.csv', plot_dir='plots'):
     """
     Run baseline method (no dropout, no normalization).
 
@@ -31,29 +27,34 @@ def run_baseline(model_type='cnn', dataset='cifar10', lightweight=False, batch_s
 
     # === Dataset Loading Only ===
     if dataset == 'cifar10':
+        from data import cifar
         train_loader = cifar.get_cifar_dataset('cifar10', train=True)
         test_loader = cifar.get_cifar_dataset('cifar10', train=False)
         input_channels = 3
         num_classes = 10
 
     elif dataset == 'cifar100':
+        from data import cifar
         train_loader = cifar.get_cifar_dataset('cifar100', train=True)
         test_loader = cifar.get_cifar_dataset('cifar100', train=False)
         input_channels = 3
         num_classes = 100
 
     elif dataset == 'mnist':
+        from data import mnist
         train_loader = mnist.get_mnist_dataset(train=True)
         test_loader = mnist.get_mnist_dataset(train=False)
         input_size = 784
         num_classes = 10
 
     elif dataset == 'imdb':
+        from data import imdb
         train_loader, test_loader, vocab = imdb.get_imdb_dataset()
         vocab_size = len(vocab)
         num_classes = 2
 
     elif dataset == 'uci_adult':
+        from data import uci_adult
         train_loader, test_loader, _, _ = uci_adult.get_adult_dataloaders()
         input_size = 105
         num_classes = 2
@@ -107,7 +108,7 @@ def run_baseline(model_type='cnn', dataset='cifar10', lightweight=False, batch_s
         raise ValueError(f"Unsupported model type: {model_type}")
 
     # === Train the model ===
-    train(model, train_loader, test_loader, epochs=10)
+    train(model, train_loader, test_loader, epochs=epochs, lr=lr, log_file=log_file, plot_dir=plot_dir)
 
 
 if __name__ == '__main__':

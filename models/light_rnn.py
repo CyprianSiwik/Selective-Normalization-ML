@@ -1,7 +1,9 @@
-#INTEGRATE LIGHT MODELS INTO TRAIN< MAIN< METHODS< FILL IN SELECTIVE_NORM WITH THE ACTUAL METHOD OF ONLY NORMALIZING THE NON DROPPED NEURONS
 # Lightweight RNN model definition
 import torch
 import torch.nn as nn
+
+from models.norm_utils import make_norm, apply_dropout_norm
+
 
 class LightRNN(nn.Module):
     def __init__(self,
@@ -13,7 +15,9 @@ class LightRNN(nn.Module):
                  rnn_type='lstm',
                  bidirectional=False,
                  dropout=0.5,
-                 pad_idx=0):
+                 pad_idx=0,
+                 norm=None,
+                 norm_order='after_dropout'):
         """
         Lightweight RNN-based classifier for text with reduced dimensions.
 
@@ -27,8 +31,12 @@ class LightRNN(nn.Module):
             bidirectional (bool): Whether to use bidirectional RNN.
             dropout (float): Dropout rate.
             pad_idx (int): Index for padding token in embedding.
+            norm (str or None): 'batch', 'layer', 'group', 'selective', or None.
+            norm_order (str): 'before_dropout' or 'after_dropout'.
         """
         super(LightRNN, self).__init__()
+        self.norm_type = norm
+        self.norm_order = norm_order
 
         self.embedding = nn.Embedding(vocab_size, embed_dim, padding_idx=pad_idx)
         self.rnn_type = rnn_type.lower()
@@ -51,6 +59,7 @@ class LightRNN(nn.Module):
         direction_factor = 2 if bidirectional else 1
         self.fc = nn.Linear(hidden_dim * direction_factor, num_classes)
         self.dropout = nn.Dropout(dropout)
+        self.norm = make_norm(norm, hidden_dim * direction_factor, spatial=False, dropout_rate=dropout)
 
     def forward(self, x):
         embedded = self.dropout(self.embedding(x))  # [batch_size, seq_len, embed_dim]
@@ -68,4 +77,5 @@ class LightRNN(nn.Module):
         else:
             hidden = hidden[-1]
 
-        return self.fc(self.dropout(hidden))
+        hidden = apply_dropout_norm(hidden, self.dropout, self.norm, self.norm_type, self.norm_order)
+        return self.fc(hidden)
