@@ -9,10 +9,11 @@ from models.light_mlp import LightMLP
 from models.light_rnn import LightRNN
 
 from train import train
+import torch
 
 
 def run_standard_combo(model_type='cnn', dataset='cifar10', dropout_rate=0.3, normalization='batch',
-                        lightweight=False, epochs=10, lr=0.001, log_file='training_log.csv', plot_dir='plots'):
+                        lightweight=False, epochs=10, lr=0.001, log_file='training_log.csv', plot_dir='plots', seed=None):
     """
     Run training with standard combo: dropout followed by normalization.
 
@@ -23,6 +24,9 @@ def run_standard_combo(model_type='cnn', dataset='cifar10', dropout_rate=0.3, no
         normalization (str): 'batch', 'layer', or 'group'
         lightweight (bool): Use lightweight model variants if True
     """
+    if seed is not None:
+        torch.manual_seed(seed)
+
     input_channels = None
     num_classes = None
     input_size = None
@@ -47,6 +51,7 @@ def run_standard_combo(model_type='cnn', dataset='cifar10', dropout_rate=0.3, no
         from data import mnist
         train_loader = mnist.get_mnist_dataset(train=True)
         test_loader = mnist.get_mnist_dataset(train=False)
+        input_channels = 1
         input_size = 784
         num_classes = 10
 
@@ -110,7 +115,7 @@ def run_standard_combo(model_type='cnn', dataset='cifar10', dropout_rate=0.3, no
         raise ValueError(f"Unsupported model type: {model_type}")
 
     # === Train ===
-    train(model, train_loader, test_loader, epochs=epochs, lr=lr, log_file=log_file, plot_dir=plot_dir)
+    return train(model, train_loader, test_loader, epochs=epochs, lr=lr, log_file=log_file, plot_dir=plot_dir)
 
 
 if __name__ == '__main__':

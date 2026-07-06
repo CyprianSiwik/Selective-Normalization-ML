@@ -29,6 +29,7 @@ def main():
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
     parser.add_argument('--log_file', type=str, default='training_log.csv', help='Path to CSV log file')
     parser.add_argument('--plot_dir', type=str, default='plots', help='Directory for saving plots')
+    parser.add_argument('--seed', type=int, default=None, help='Random seed for reproducibility')
 
     args = parser.parse_args()
 
@@ -40,6 +41,7 @@ def main():
         'lr': args.lr,
         'log_file': args.log_file,
         'plot_dir': args.plot_dir,
+        'seed': args.seed,
     }
 
     if args.method == 'baseline':

@@ -3,6 +3,14 @@ import torch.nn as nn
 
 from models.selective_norm import SelectiveNormalization
 
+# The set of module types make_norm() can produce. Used by train.py to find
+# the normalization "study site" closest to the classifier head, so
+# activation statistics can be captured uniformly regardless of which norm
+# type (or none) a given run uses.
+STUDY_SITE_TYPES = (
+    nn.Identity, nn.BatchNorm1d, nn.BatchNorm2d, nn.LayerNorm, nn.GroupNorm, SelectiveNormalization,
+)
+
 
 def make_norm(norm_type, num_features, spatial=False, dropout_rate=0.5):
     """

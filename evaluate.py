@@ -21,7 +21,7 @@ def evaluate_simple(model, data_loader):
     return 100 * correct / total
 
 
-def evaluate_detailed(model, data_loader):
+def evaluate_detailed(model, data_loader, verbose=True):
     """Full evaluation: accuracy, loss, and inference time."""
     model.eval()
     correct, total = 0, 0
@@ -48,9 +48,10 @@ def evaluate_detailed(model, data_loader):
     avg_loss = total_loss / len(data_loader)
     avg_time = sum(inference_times) / len(inference_times)
 
-    print(f"Test Accuracy: {accuracy:.2f}%")
-    print(f"Test Loss: {avg_loss:.4f}")
-    print(f"Avg Inference Time per Batch: {avg_time:.4f}s")
+    if verbose:
+        print(f"Test Accuracy: {accuracy:.2f}%")
+        print(f"Test Loss: {avg_loss:.4f}")
+        print(f"Avg Inference Time per Batch: {avg_time:.4f}s")
 
     return {
         'accuracy': accuracy,

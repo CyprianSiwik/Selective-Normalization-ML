@@ -6,4 +6,5 @@ data/cifar-100-python/
 data/*.tar.gz
 training_log.csv
 plots/
+results/
 .idea/

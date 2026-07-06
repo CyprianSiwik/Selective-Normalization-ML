@@ -41,6 +41,40 @@ def plot_training_curves(train_losses, train_accuracies, test_accuracies, plot_d
     plt.close()
 
 
+def plot_extra_metrics(grad_norms, activation_stds, plot_dir):
+    """
+    Plot gradient norm and activation std per epoch — diagnostics for
+    training stability and the dropout/normalization interaction under study.
+
+    Args:
+        grad_norms (list of float): Mean gradient L2 norm per epoch.
+        activation_stds (list of float): Mean activation std (at the norm
+            study site) per epoch.
+        plot_dir (str): Directory to save plots.
+    """
+    os.makedirs(plot_dir, exist_ok=True)
+
+    plt.figure()
+    plt.plot(grad_norms, label='Grad Norm')
+    plt.title('Gradient Norm')
+    plt.xlabel('Epoch')
+    plt.ylabel('L2 Norm')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(os.path.join(plot_dir, 'grad_norm.png'))
+    plt.close()
+
+    plt.figure()
+    plt.plot(activation_stds, label='Activation Std')
+    plt.title('Activation Std at Study Site')
+    plt.xlabel('Epoch')
+    plt.ylabel('Std')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(os.path.join(plot_dir, 'activation_std.png'))
+    plt.close()
+
+
 def load_log_and_plot(log_file, plot_dir='plots'):
     """
     Load a CSV log file and plot training curves.

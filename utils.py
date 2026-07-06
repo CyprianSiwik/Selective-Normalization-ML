@@ -12,7 +12,4 @@ def unpack_batch(batch):
     if isinstance(x, list):
         x = pad_sequence(x, batch_first=True)
 
-    if isinstance(x, torch.Tensor) and x.dim() > 2:
-        x = x.view(x.size(0), -1)
-
     return x, y

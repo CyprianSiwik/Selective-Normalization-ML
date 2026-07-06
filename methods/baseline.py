@@ -7,10 +7,11 @@ from models.light_mlp import LightMLP
 from models.light_rnn import LightRNN
 
 from train import train
+import torch
 
 
 def run_baseline(model_type='cnn', dataset='cifar10', lightweight=False, batch_size=64,
-                  epochs=10, lr=0.001, log_file='training_log.csv', plot_dir='plots'):
+                  epochs=10, lr=0.001, log_file='training_log.csv', plot_dir='plots', seed=None):
     """
     Run baseline method (no dropout, no normalization).
 
@@ -19,6 +20,9 @@ def run_baseline(model_type='cnn', dataset='cifar10', lightweight=False, batch_s
         dataset (str): Dataset name
         lightweight (bool): Use lightweight model variants if True
     """
+    if seed is not None:
+        torch.manual_seed(seed)
+
     input_channels = None
     input_size = None
     num_classes = None
@@ -44,6 +48,7 @@ def run_baseline(model_type='cnn', dataset='cifar10', lightweight=False, batch_s
         from data import mnist
         train_loader = mnist.get_mnist_dataset(train=True)
         test_loader = mnist.get_mnist_dataset(train=False)
+        input_channels = 1
         input_size = 784
         num_classes = 10
 
@@ -108,7 +113,7 @@ def run_baseline(model_type='cnn', dataset='cifar10', lightweight=False, batch_s
         raise ValueError(f"Unsupported model type: {model_type}")
 
     # === Train the model ===
-    train(model, train_loader, test_loader, epochs=epochs, lr=lr, log_file=log_file, plot_dir=plot_dir)
+    return train(model, train_loader, test_loader, epochs=epochs, lr=lr, log_file=log_file, plot_dir=plot_dir)
 
 
 if __name__ == '__main__':
