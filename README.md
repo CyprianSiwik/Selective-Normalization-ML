@@ -36,8 +36,11 @@ A single run, or even five runs at one dropout rate, doesn't tell you much — t
 python run_experiments.py --datasets mnist uci_adult cifar10 --models cnn mlp rnn \
                            --epochs 20 --seeds 0 1 2 \
                            --dropout_rates 0.1 0.3 0.5 0.7 0.9 \
+                           --normalizations batch layer group \
                            --results_dir results
 ```
+
+Sweeping `--normalizations` matters, not just `--dropout_rates`: batch norm's cross-sample statistics make it the most exposed to the claimed distortion mechanism (dropped zeros pollute a whole batch's stats), while layer/group norm are computed per-sample and may not show the effect at all. Every downstream comparison below treats each normalization type separately rather than averaging them together, so `batch` vs `layer` vs `group` is itself part of the result, not noise to average out.
 
 Invalid (model, dataset) pairs (e.g. `cnn`+`uci_adult`) are skipped automatically, and a failed run (e.g. a flaky download) doesn't abort the sweep — it's recorded in `results/manifest.json` and excluded from the comparison. Then aggregate:
 
@@ -45,12 +48,15 @@ Invalid (model, dataset) pairs (e.g. `cnn`+`uci_adult`) are skipped automaticall
 python compare_results.py --results_dir results
 ```
 
-This writes:
-- `results/summary.csv` — per-run metrics.
-- `results/summary_by_method.csv` — averaged across seeds, ranked by best test accuracy per model/dataset/dropout_rate.
-- `results/significance_selective_vs_standard_combo.csv` — a paired t-test (paired by seed) at each dropout rate; needs `--seeds` with at least 2 values to produce a p-value.
+Every run also logs, per epoch: batch-to-batch gradient-norm std (training-stability, not just its mean), train- and eval-mode activation mean/std at the study site (so selective normalization's own train/eval mismatch — its running stats are accumulated only from dropout survivors, but eval mode sees every activation — is visible instead of assumed away), and the train/test accuracy gap (generalization, independent of raw accuracy).
+
+`compare_results.py` writes:
+- `results/summary.csv` — per-run metrics, including the above.
+- `results/summary_by_method.csv` — averaged across seeds, ranked by best test accuracy per model/dataset/dropout_rate/normalization.
+- `results/significance_selective_vs_standard_combo.csv` — a paired t-test (paired by seed) at each dropout rate x normalization, with Cohen's d (paired effect size) alongside the p-value and a Holm-Bonferroni-corrected p-value (`p_value_holm`) across every test in the sweep, since a handful of significant-looking p-values is expected by chance once you run dozens of them. Needs `--seeds` with at least 2 values to produce a p-value.
+- `results/cost_benefit_selective_vs_standard_combo.csv` — selective's per-epoch time, per-batch inference time, and peak memory overhead (%) relative to standard_combo, next to the accuracy gap at the same setting — so a gap that only shows up alongside a large compute/memory cost reads differently than one that's free.
 - `results/comparison/compare_<model>_<dataset>[_dr<rate>].png` — test-accuracy-vs-epoch curves, one figure per dropout rate.
-- `results/comparison/dropout_gap_<model>_<dataset>.png` — **the key plot**: (selective − standard_combo) best-test-accuracy gap vs. dropout rate, with error bars across seeds. A gap that grows with dropout rate is evidence *for* the hypothesis; flat/near-zero across the whole sweep is evidence *against* it. Needs at least two `--dropout_rates` values to render.
+- `results/comparison/dropout_gap_<model>_<dataset>_norm-<normalization>.png` — **the key plot**: (selective − standard_combo) best-test-accuracy gap vs. dropout rate, with error bars across seeds, one figure per normalization type. A gap that grows with dropout rate is evidence *for* the hypothesis; flat/near-zero across the whole sweep is evidence *against* it. Needs at least two `--dropout_rates` values to render.
 
 For the mechanistic (not just accuracy) picture, overlay the actual activation distributions at the normalization study site:
 
@@ -58,4 +64,7 @@ For the mechanistic (not just accuracy) picture, overlay the actual activation d
 python plot_activation_histograms.py --results_dir results
 ```
 
-This writes `results/activation_histograms/activation_hist_<model>_<dataset>_dr<rate>.png`, comparing all five methods' post-normalization activation distributions at a given dropout rate — a direct look at whether `standard_combo` actually distorts the distribution relative to `selective`, independent of downstream accuracy.
+This writes:
+- `results/activation_histograms/activation_hist_<model>_<dataset>_dr<rate>_norm-<normalization>.png` — all five methods' post-normalization activation distributions at a given dropout rate and normalization type — a direct look at whether `standard_combo` actually distorts the distribution relative to `selective`, independent of downstream accuracy.
+- `results/activation_distortion.csv` and `results/comparison/distortion_vs_dropout_<model>_<dataset>_norm-<normalization>.png` — the same standard_combo-vs-selective distortion quantified as a scalar (Wasserstein distance and Jensen-Shannon distance between the two distributions, plus each one's fraction of near-zero activations) and plotted against dropout rate, so the distortion claim doesn't rest on eyeballing histogram overlays.
+- `results/distortion_vs_accuracy_gap.csv` (only if `compare_results.py` has already been run) — merges the distortion metrics with the accuracy gap and reports their correlation, the direct test of whether the claimed mechanism actually predicts the downstream accuracy effect rather than the two just moving independently.

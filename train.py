@@ -17,8 +17,9 @@ from models.norm_utils import STUDY_SITE_TYPES
 
 LOG_COLUMNS = [
     'Epoch', 'Train Loss', 'Train Acc (%)', 'Test Loss', 'Test Acc (%)',
-    'Epoch Time (s)', 'Inference Time (s/batch)', 'Grad Norm',
-    'Activation Mean', 'Activation Std', 'Peak Memory (MB)',
+    'Epoch Time (s)', 'Inference Time (s/batch)', 'Grad Norm', 'Grad Norm Std',
+    'Activation Mean', 'Activation Std', 'Eval Activation Mean', 'Eval Activation Std',
+    'Peak Memory (MB)',
 ]
 
 
@@ -46,22 +47,37 @@ def _find_study_site(model):
 
 def _attach_activation_hook(model):
     """
-    Track running mean/std of the study-site activations, and keep a raw
-    sample of its output from the most recent training batch — used to
-    plot activation-distribution histograms (see plot_activation_histograms.py)
+    Track running mean/std of the study-site activations, separately for
+    training-mode and eval-mode forward passes, and keep a raw sample of
+    its training-mode output from the most recent batch — used to plot
+    activation-distribution histograms (see plot_activation_histograms.py)
     that make the dropout/normalization distortion the README describes
     directly visible, rather than only summarized as a scalar.
+
+    The train/eval split also exposes a mismatch specific to selective
+    normalization: its running stats are accumulated only from
+    dropout-surviving activations during training, but eval-mode forward
+    passes see every activation (dropout is off), so the two can diverge
+    more than for the other methods.
     """
-    stats = {'sum_mean': 0.0, 'sum_std': 0.0, 'count': 0, 'last_raw': None}
+    stats = {
+        'train_sum_mean': 0.0, 'train_sum_std': 0.0, 'train_count': 0,
+        'eval_sum_mean': 0.0, 'eval_sum_std': 0.0, 'eval_count': 0,
+        'last_raw': None,
+    }
     site = _find_study_site(model)
 
     def hook(module, inputs, output):
-        if module.training:
-            with torch.no_grad():
-                stats['sum_mean'] += output.mean().item()
-                stats['sum_std'] += output.std().item()
-                stats['count'] += 1
+        with torch.no_grad():
+            if module.training:
+                stats['train_sum_mean'] += output.mean().item()
+                stats['train_sum_std'] += output.std().item()
+                stats['train_count'] += 1
                 stats['last_raw'] = output.detach().cpu().numpy().ravel()
+            else:
+                stats['eval_sum_mean'] += output.mean().item()
+                stats['eval_sum_std'] += output.std().item()
+                stats['eval_count'] += 1
 
     handle = site.register_forward_hook(hook) if site is not None else None
     return stats, handle
@@ -89,8 +105,8 @@ def train(model, train_loader, test_loader, epochs=10, lr=0.001, log_file='train
         model.train()
         running_loss = 0.0
         correct, total = 0, 0
-        grad_norm_sum = 0.0
-        activation_stats['sum_mean'] = activation_stats['sum_std'] = activation_stats['count'] = 0
+        grad_norms = []
+        activation_stats['train_sum_mean'] = activation_stats['train_sum_std'] = activation_stats['train_count'] = 0
 
         for batch in train_loader:
             x, y = unpack_batch(batch)
@@ -103,7 +119,7 @@ def train(model, train_loader, test_loader, epochs=10, lr=0.001, log_file='train
             for p in model.parameters():
                 if p.grad is not None:
                     grad_norm_sq += p.grad.detach().float().norm(2).item() ** 2
-            grad_norm_sum += grad_norm_sq ** 0.5
+            grad_norms.append(grad_norm_sq ** 0.5)
 
             optimizer.step()
 
@@ -116,17 +132,26 @@ def train(model, train_loader, test_loader, epochs=10, lr=0.001, log_file='train
 
         train_acc = 100 * correct / total
         avg_loss = running_loss / len(train_loader)
-        avg_grad_norm = grad_norm_sum / len(train_loader)
-        avg_activation_mean = activation_stats['sum_mean'] / max(activation_stats['count'], 1)
-        avg_activation_std = activation_stats['sum_std'] / max(activation_stats['count'], 1)
+        # Mean gradient norm (convergence proxy) and its batch-to-batch std
+        # within the epoch (training-stability proxy: a method that's
+        # equally accurate but swings harder between batches is still less
+        # stable).
+        avg_grad_norm = float(np.mean(grad_norms))
+        grad_norm_std = float(np.std(grad_norms))
+        avg_activation_mean = activation_stats['train_sum_mean'] / max(activation_stats['train_count'], 1)
+        avg_activation_std = activation_stats['train_sum_std'] / max(activation_stats['train_count'], 1)
 
+        activation_stats['eval_sum_mean'] = activation_stats['eval_sum_std'] = activation_stats['eval_count'] = 0
         test_metrics = evaluate_detailed(model, test_loader, verbose=False)
+        avg_eval_activation_mean = activation_stats['eval_sum_mean'] / max(activation_stats['eval_count'], 1)
+        avg_eval_activation_std = activation_stats['eval_sum_std'] / max(activation_stats['eval_count'], 1)
         peak_memory = _peak_memory_mb()
 
         row = [
             epoch, avg_loss, train_acc, test_metrics['loss'], test_metrics['accuracy'],
-            epoch_time, test_metrics['inference_time'], avg_grad_norm,
-            avg_activation_mean, avg_activation_std, peak_memory,
+            epoch_time, test_metrics['inference_time'], avg_grad_norm, grad_norm_std,
+            avg_activation_mean, avg_activation_std, avg_eval_activation_mean, avg_eval_activation_std,
+            peak_memory,
         ]
 
         with open(log_file, mode='a', newline='') as file:
